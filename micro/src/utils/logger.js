@@ -49,4 +49,7 @@ class Logger {
     }
 }
 
-export default Logger;
+// Create and export logger instance
+const logger = new Logger(process.env.LOG_LEVEL || 'info');
+
+export default logger;
