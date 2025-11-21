@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import config from './config/index.js';
-import { initializeStorage } from './modules/storage/index.js';
+import { createStorage } from './modules/storage/index.js';
 import EmailService from './modules/delivery/email.js';
 import RateLimiter from './modules/ratelimit/index.js';
 import EmailController from './api/controllers/email.controller.js';
@@ -29,7 +29,7 @@ async function initializeServices() {
     try {
         // Initialize storage (for rate limiting)
         logger.info('Initializing storage...');
-        storage = await initializeStorage(config);
+        storage = await createStorage(config);
 
         // Initialize email service
         logger.info('Initializing email service...');

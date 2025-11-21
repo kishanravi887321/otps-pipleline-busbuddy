@@ -1,4 +1,4 @@
-import { renderTemplate, listTemplates } from '../modules/templates/index.js';
+import { renderTemplate, listTemplates } from '../../modules/templates/index.js';
 
 /**
  * Email Controller handling API requests
