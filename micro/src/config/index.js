@@ -29,12 +29,25 @@ const config = {
 
     // Email Configuration
     email: {
+        provider: process.env.EMAIL_PROVIDER || 'smtp', // smtp, brevo, ses
         host: process.env.EMAIL_HOST || 'smtp.ethereal.email',
         port: parseInt(process.env.EMAIL_PORT, 10) || 587,
         secure: process.env.EMAIL_SECURE === 'true',
         user: process.env.EMAIL_USER || '',
         password: process.env.EMAIL_PASSWORD || '',
         from: process.env.EMAIL_FROM || 'noreply@busbuddy.com',
+    },
+
+    // Brevo Configuration
+    brevo: {
+        apiKey: process.env.BREVO_API_KEY || '',
+    },
+
+    // AWS SES Configuration
+    ses: {
+        region: process.env.AWS_REGION || 'us-east-1',
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
     },
 
     // Logging

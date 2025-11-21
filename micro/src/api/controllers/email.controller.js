@@ -90,6 +90,7 @@ class EmailController {
             success: true,
             message: 'Email service is running',
             timestamp: new Date().toISOString(),
+            provider: this.emailService.getProviderName(),
             availableTemplates: listTemplates(),
         });
     }

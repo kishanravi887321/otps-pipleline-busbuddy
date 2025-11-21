@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import config from './config/index.js';
 import { createStorage } from './modules/storage/index.js';
+import { createEmailProvider } from './modules/providers/index.js';
 import EmailService from './modules/delivery/email.js';
 import RateLimiter from './modules/ratelimit/index.js';
 import EmailController from './api/controllers/email.controller.js';
@@ -31,9 +32,10 @@ async function initializeServices() {
         logger.info('Initializing storage...');
         storage = await createStorage(config);
 
-        // Initialize email service
+        // Initialize email service with provider
         logger.info('Initializing email service...');
-        emailService = new EmailService(config.email, logger);
+        const emailProvider = createEmailProvider(config, logger);
+        emailService = new EmailService(emailProvider, logger);
         await emailService.init();
 
         // Initialize rate limiter
@@ -56,12 +58,18 @@ app.get('/', (req, res) => {
         success: true,
         message: 'Email Microservice API',
         version: '1.0.0',
+        provider: emailService ? emailService.getProviderName() : 'Not initialized',
         endpoints: {
             send: 'POST /api/email/send',
             health: 'GET /api/email/health',
+            test: 'POST /api/test-send',
         },
     });
 });
+
+// Test endpoint (no auth required for testing)
+import testRouter from './test-email.js';
+app.use('/api', testRouter);
 
 // API routes
 app.use('/api/email', (req, res, next) => {
