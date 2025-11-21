@@ -2,10 +2,11 @@
  * Rate limiter using sliding window algorithm
  */
 class RateLimiter {
-    constructor(storage, config) {
+    constructor(storage, rateLimitConfig, logger) {
         this.storage = storage;
-        this.windowMinutes = config.rateLimit.windowMinutes;
-        this.maxRequests = config.rateLimit.maxRequests;
+        this.logger = logger;
+        this.windowMinutes = rateLimitConfig.windowMinutes;
+        this.maxRequests = rateLimitConfig.maxRequests;
     }
 
     /**
