@@ -1,7 +1,7 @@
 {
-  "name": "otps_pipeline",
+  "name": "email-service",
   "version": "1.0.0",
-  "description": "Modular and scalable OTP pipeline microservice",
+  "description": "Modular and scalable Email Delivery Microservice for BusBuddy",
   "main": "src/server.js",
   "type": "module",
   "scripts": {
@@ -12,9 +12,10 @@
     "format": "prettier --write src/**/*.js"
   },
   "keywords": [
-    "otp",
+    "email",
     "microservice",
-    "authentication",
+    "notification",
+    "smtp",
     "node",
     "javascript"
   ],

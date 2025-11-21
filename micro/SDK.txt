@@ -1,0 +1,328 @@
+# Email Service SDK - Implementation Guide
+
+## Overview
+This document explains how to create the SDK package for the Email Microservice.
+The SDK will be created in a **separate folder/repository** for independent versioning and publishing.
+
+---
+
+## SDK Structure
+
+```
+email-service-sdk/
+├── src/
+│   └── index.js          # Main EmailClient class
+├── package.json          # Package configuration
+├── README.md             # Usage documentation
+└── .gitignore
+```
+
+---
+
+## Implementation Steps
+
+### Step 1: Create Package Structure
+
+```bash
+mkdir email-service-sdk
+cd email-service-sdk
+npm init -y
+```
+
+### Step 2: Create EmailClient (src/index.js)
+
+```javascript
+import axios from 'axios';
+
+export class EmailClient {
+  constructor(serviceUrl, apiKey) {
+    this.baseURL = serviceUrl;
+    this.apiKey = apiKey;
+    this.client = axios.create({
+      baseURL: serviceUrl,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-KEY': apiKey  // SECURITY: API Key authentication
+      }
+    });
+  }
+
+  /**
+   * Send OTP email
+   * @param {string} to - Recipient email
+   * @param {Object} data - { otp, userName, expiryMinutes }
+   */
+  async sendOTP(to, data) {
+    const { data: response } = await this.client.post('/api/email/send', {
+      to,
+      template: 'otp',
+      data: {
+        otp: data.otp,
+        userName: data.userName || 'User',
+        companyName: 'BusBuddy',
+        expiryMinutes: data.expiryMinutes || 5
+      }
+    });
+    return response;
+  }
+
+  /**
+   * Send booking confirmation email
+   * @param {string} to - Recipient email
+   * @param {Object} data - Booking details
+   */
+ async sendBooking(to, data) {
+    const { data: response } = await this.client.post('/api/email/send', {
+      to,
+      template: 'booking',
+      data: {
+        bookingId: data.bookingId,
+        userName: data.userName,
+        route: data.route,
+        date: data.date,
+        seats: data.seats,
+        price: data.price
+      }
+    });
+    return response;
+  }
+
+  /**
+   * Send welcome email
+   * @param {string} to - Recipient email
+   * @param {Object} data - { userName }
+   */
+  async sendWelcome(to, data) {
+    const { data: response } = await this.client.post('/api/email/send', {
+      to,
+      template: 'welcome',
+      data: {
+        userName: data.userName,
+        companyName: 'BusBuddy'
+      }
+    });
+    return response;
+  }
+
+  /**
+   * Send custom email
+   * @param {string} to - Recipient email
+   * @param {string} subject - Email subject
+   * @param {string} htmlContent - Email HTML content
+   */
+  async sendCustom(to, subject, htmlContent) {
+    const { data: response } = await this.client.post('/api/email/send', {
+      to,
+      template: 'custom',
+      subject,
+      data: { htmlContent }
+    });
+    return response;
+  }
+
+  /**
+   * Check service health
+   */
+  async health() {
+    const { data } = await this.client.get('/api/email/health');
+    return data;
+  }
+}
+```
+
+### Step 3: Create package.json
+
+```json
+{
+  "name": "@busbuddy/email-client",
+  "version": "1.0.0",
+  "description": "SDK for BusBuddy Email Microservice",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["busbuddy", "email", "sdk", "microservice"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.6.0"
+  }
+}
+```
+
+### Step 4: Create README.md
+
+```markdown
+# BusBuddy Email Service SDK
+
+Official SDK for BusBuddy Email Microservice.
+
+## Installation
+
+\`\`\`bash
+npm install @busbuddy/email-client
+\`\`\`
+
+## Usage
+
+\`\`\`javascript
+import { EmailClient } from '@busbuddy/email-client';
+
+// Initialize with service URL and API key
+const emailClient = new EmailClient(
+  'http://localhost:3000',
+  'your-api-key-here'
+);
+
+// Send OTP email
+await emailClient.sendOTP('user@example.com', {
+  otp: '123456',
+  userName: 'Kishan',
+  expiryMinutes: 5
+});
+
+// Send booking confirmation
+await emailClient.sendBooking('user@example.com', {
+  bookingId: 'BB12345',
+  userName: 'Kishan',
+  route: 'Mumbai to Pune',
+  date: '2025-11-25',
+  seats: 'A12, A13',
+  price: '₹800'
+});
+
+// Send welcome email
+await emailClient.sendWelcome('user@example.com', {
+  userName: 'Kishan'
+});
+\`\`\`
+
+## Configuration
+
+Set environment variables in your backend:
+
+\`\`\`env
+EMAIL_SERVICE_URL=http://localhost:3000
+EMAIL_SERVICE_API_KEY=your-secret-api-key
+\`\`\`
+
+## Security
+
+- Always use HTTPS in production
+- Keep API key secret in environment variables
+- Never commit API keys to git
+\`\`\`
+
+---
+
+## Usage in BusBuddy Backend
+
+### Install SDK
+```bash
+cd busbuddy-backend
+npm install ../email-service-sdk  # Local during development
+# OR
+npm install @busbuddy/email-client  # After publishing to npm
+```
+
+### Configure in Backend
+```javascript
+// config/email.js
+import { EmailClient } from '@busbuddy/email-client';
+
+export const emailClient = new EmailClient(
+  process.env.EMAIL_SERVICE_URL,
+  process.env.EMAIL_SERVICE_API_KEY
+);
+```
+
+### Use in Controllers
+```javascript
+// controllers/authController.js
+import { emailClient } from '../config/email.js';
+
+export async function register(req, res) {
+  const { email, name } = req.body;
+  
+  // Generate OTP (in your backend)
+  const otp = generateOTP();
+  await db.saveOTP(email, otp);
+  
+  // Send via email service
+  await emailClient.sendOTP(email, {
+    otp,
+    userName: name,
+    expiryMinutes: 5
+  });
+  
+  res.json({ message: 'OTP sent to your email' });
+}
+```
+
+---
+
+## Publishing SDK (Optional)
+
+### To NPM (Public)
+```bash
+cd email-service-sdk
+npm login
+npm publish --access public
+```
+
+### To Private NPM Registry
+```bash
+npm publish --registry=https://your-private-registry.com
+```
+
+### Local Development
+```bash
+# In SDK folder
+npm link
+
+# In backend folder
+npm link @busbuddy/email-client
+```
+
+---
+
+## API Key Security
+
+The SDK automatically adds `X-API-KEY` header to all requests:
+
+```javascript
+headers: {
+  'X-API-KEY': 'your-secret-key'
+}
+```
+
+The microservice validates this before processing any email request.
+
+---
+
+## Error Handling
+
+```javascript
+try {
+  await emailClient.sendOTP(email, { otp });
+} catch (error) {
+  if (error.response?.status === 401) {
+    console.error('Invalid API key');
+  } else if (error.response?.status === 429) {
+    console.error('Rate limit exceeded');
+  } else {
+    console.error('Email send failed:', error.message);
+  }
+}
+```
+
+---
+
+## Next Steps
+
+1. Create SDK folder when ready
+2. Copy code from this guide
+3. Test locally with `npm link`
+4. Publish to NPM when stable
+5. Use in all BusBuddy services
