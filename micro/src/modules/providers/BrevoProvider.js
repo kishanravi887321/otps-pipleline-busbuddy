@@ -30,9 +30,13 @@ class BrevoProvider extends EmailProvider {
 
         const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
 
+        // Use Brevo sender email if configured, otherwise fall back to emailConfig.from
+        const senderEmail = this.config.senderEmail || this.emailConfig.from;
+        const senderName = this.config.senderName || 'BusBuddy';
+
         sendSmtpEmail.sender = {
-            name: 'BusBuddy',
-            email: this.emailConfig.from
+            name: senderName,
+            email: senderEmail
         };
         sendSmtpEmail.to = [{ email: to }];
         sendSmtpEmail.subject = subject;
