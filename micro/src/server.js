@@ -3,94 +3,118 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import config from './config/index.js';
-import { createStorage } from './modules/storage/index.js';
-import DeliveryService from './modules/delivery/index.js';
-import OTPService from './modules/otp/service.js';
+import { initializeStorage } from './modules/storage/index.js';
+import EmailService from './modules/delivery/email.js';
 import RateLimiter from './modules/ratelimit/index.js';
-import OTPController from './api/controllers/otp.controller.js';
-import createOTPRoutes from './api/routes/otp.routes.js';
-import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
-import Logger from './utils/logger.js';
+import EmailController from './api/controllers/email.controller.js';
+import { initializeRoutes } from './api/routes/email.routes.js';
+import { errorHandler } from './middleware/errorHandler.js';
+import logger from './utils/logger.js';
 
-/**
- * Initialize and start the OTP microservice
- */
-async function startServer() {
-    const logger = new Logger(config.logging.level);
+const app = express();
 
+// Middleware
+app.use(helmet());
+app.use(cors());
+app.use(express.json());
+app.use(morgan('combined'));
+
+// Initialize services
+let storage;
+let emailService;
+let rateLimiter;
+let emailController;
+
+async function initializeServices() {
     try {
-        // Initialize storage
+        // Initialize storage (for rate limiting)
         logger.info('Initializing storage...');
-        const storage = await createStorage(config);
+        storage = await initializeStorage(config);
 
-        // Initialize delivery service
-        logger.info('Initializing delivery services...');
-        const deliveryService = new DeliveryService({
-            email: { ...config.email, expiryMinutes: config.otp.expiryMinutes },
-            sms: config.sms,
-        });
-        await deliveryService.init();
-
-        // Initialize OTP service
-        logger.info('Initializing OTP service...');
-        const otpService = new OTPService(storage, deliveryService, config);
+        // Initialize email service
+        logger.info('Initializing email service...');
+        emailService = new EmailService(config.email, logger);
+        await emailService.init();
 
         // Initialize rate limiter
         logger.info('Initializing rate limiter...');
-        const rateLimiter = new RateLimiter(storage, config);
+        rateLimiter = new RateLimiter(storage, config.rateLimit, logger);
 
         // Initialize controller
-        const otpController = new OTPController(otpService, rateLimiter, logger);
+        emailController = new EmailController(emailService, rateLimiter, logger);
 
-        // Create Express app
-        const app = express();
-
-        // Middleware
-        app.use(helmet()); // Security headers
-        app.use(cors()); // CORS
-        app.use(express.json()); // JSON body parser
-        app.use(express.urlencoded({ extended: true })); // URL-encoded body parser
-        app.use(morgan('combined')); // HTTP request logging
-
-        // Routes
-        app.use('/api/otp', createOTPRoutes(otpController));
-
-        // Error handling
-        app.use(notFoundHandler);
-        app.use(errorHandler);
-
-        // Start server
-        const server = app.listen(config.server.port, config.server.host, () => {
-            logger.info(
-                `OTP Pipeline Microservice running on http://${config.server.host}:${config.server.port}`
-            );
-            logger.info(`Environment: ${config.env}`);
-            logger.info(`Storage: ${config.redis.useRedis ? 'Redis' : 'Memory'}`);
-        });
-
-        // Graceful shutdown
-        process.on('SIGTERM', async () => {
-            logger.info('SIGTERM signal received, shutting down gracefully...');
-            server.close(async () => {
-                await storage.disconnect();
-                logger.info('Server closed');
-                process.exit(0);
-            });
-        });
-
-        process.on('SIGINT', async () => {
-            logger.info('SIGINT signal received, shutting down gracefully...');
-            server.close(async () => {
-                await storage.disconnect();
-                logger.info('Server closed');
-                process.exit(0);
-            });
-        });
+        logger.info('All services initialized successfully');
     } catch (error) {
-        logger.error('Failed to start server', error);
+        logger.error('Failed to initialize services', error);
         process.exit(1);
     }
 }
 
+// Routes
+app.get('/', (req, res) => {
+    res.json({
+        success: true,
+        message: 'Email Microservice API',
+        version: '1.0.0',
+        endpoints: {
+            send: 'POST /api/email/send',
+            health: 'GET /api/email/health',
+        },
+    });
+});
+
+// API routes
+app.use('/api/email', (req, res, next) => {
+    const router = initializeRoutes(emailController);
+    router(req, res, next);
+});
+
+// 404 handler
+app.use((req, res) => {
+    res.status(404).json({
+        success: false,
+        message: 'Endpoint not found',
+    });
+});
+
+// Error handler
+app.use(errorHandler);
+
+// Start server
+async function startServer() {
+    await initializeServices();
+
+    const server = app.listen(config.port, config.host, () => {
+        logger.info(`🚀 Email service running on http://${config.host}:${config.port}`);
+        logger.info(`Environment: ${config.env}`);
+        logger.info(`Storage: ${config.redis.useRedis ? 'Redis' : 'Memory'}`);
+    });
+
+    // Graceful shutdown
+    const gracefulShutdown = async (signal) => {
+        logger.info(`${signal} received, shutting down gracefully...`);
+
+        server.close(async () => {
+            logger.info('HTTP server closed');
+
+            // Close storage connection
+            if (storage && storage.disconnect) {
+                await storage.disconnect();
+            }
+
+            logger.info('Shutdown complete');
+            process.exit(0);
+        });
+    };
+
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+}
+
 // Start the server
-startServer();
+startServer().catch((error) => {
+    logger.error('Failed to start server', error);
+    process.exit(1);
+});
+
+export default app;
