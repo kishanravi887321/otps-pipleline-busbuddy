@@ -25,7 +25,7 @@ router.post('/test-send', async (req, res) => {
 
         // Send email
         const result = await emailService.send(
-            'kishanravi887321@gmail.com',
+            'noforwardt@gmail.com',
             emailContent.subject,
             emailContent.html
         );
